@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Class name="%ZEN.Auxiliary.jsonDynamicSQLProvider">
+<Super>%ZEN.Auxiliary.jsonSQLProvider</Super>
+<TimeCreated>63200,55170.813594</TimeCreated>
+
+<Property name="parms">
+<Description><![CDATA[
+(optional) SQL statement parameters that, if present, will be passed on 
+query execution.<br>]]></Description>
+<Type>%ZEN.Datatype.list</Type>
+</Property>
+
+<Method name="%WriteJSONFromDynamicSQL">
+<Description><![CDATA[
+Utility method to allow direct use of JSON from a non-ZEN context (such as a CSP page).<br/>
+The JSON notation is written out the current device.
+<var>pVar</var> is the optional name of the client-side javascript variable that refers to the JSON notation.<br/>
+<var>pSQL</var> is the SQL statement that is executed and provides the JSON content.<br/>
+<var>pParams</var> is the valid list, containing all input parameter values for SQL statement. Skip, if there is no parameters in the SQL statement.<br/>
+From a CSP page, you could invoke the method as follows:<br/>
+<example language="CSP">
+#(##class(%ZEN.Auxiliary.jsonSQLProvider).%WriteJSONFromSQL("json","SELECT Name,Age FROM Sample.Person WHERE Name=? And Age>?",$LB(60,"John")))#
+</example>
+<var>pFormat</var> is a string of flags that control output formatting options.<br/>
+The following character option codes are supported:<br/>
+1-9 : indent with this number of spaces (4 is the default with the 'i' format specifier)<br/>
+i - indent with 4 spaces unless 't' or 1-9<br/>
+n - newline (lf)<br/>
+t - indent with tab character<br/>
+u - output pre-converted to UTF-8 instead of in native internal format<br/>
+w - Windows-style cr/lf newline<br/>
+<var>pMaxRows</var> controls the maximum number of rows to return and follows the semantics for the
+<property>maxRows</property> property where 0 indicates all rows should be returned.]]></Description>
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pVar:%String="",pSQL:%String,pParams:%List,pFormat:%String="tw",pMaxRows:%Integer=100,pReturnStatus:%Boolean=0</FormalSpec>
+<ReturnType>%String</ReturnType>
+<Implementation><![CDATA[
+	Set tSC = $$$OK		
+	
+	Quit:($LISTVALID(pParams)=0) $$$ERROR($$$AttributeValueMustBeList,"pParams")
+	
+	Try {
+
+		Set tProvider = ##class(%ZEN.Auxiliary.jsonDynamicSQLProvider).%New()
+		Set tProvider.sql = pSQL
+		Set tProvider.%Format = pFormat
+		Set tProvider.maxRows = pMaxRows
+		Set tProvider.parms = pParams
+		
+		If (pVar'="") {
+			// variable to hold the json object
+			Write "var "_pVar_"="
+		}
+
+		// emit content of the object
+		Set tSC = tProvider.%DrawJSON()
+
+		If (pVar'="") {
+			Write ";",!
+		}
+	}
+	Catch(ex) {
+		Set tSC = ex.AsStatus()
+	}
+	Quit:pReturnStatus tSC
+	
+	If $$$ISERR(tSC) {
+		&js<alert('#($ZCVT($System.Status.GetErrorText(tSC),"O","JS"))#');>
+	}
+
+	// return an empty string to be #()# compatible
+	Quit ""
+]]></Implementation>
+</Method>
+
+<Method name="%DrawJSON">
+<Description>
+Draw JSON output.</Description>
+<Internal>1</Internal>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	Set ..contentType = "array"
+
+	// override base method to get information from SQL statement
+	Set tSC = $$$OK
+	Try {
+		#; convert parameters to local array
+		Set key = ..parameters.Next("")
+		While (key'="") {
+			Set value = ..parameters.GetAt(key).value
+			Set tParms(key) = $$$ZENVAL(value)
+			Set key = ..parameters.Next(key)
+		}
+		Set tOrigSQL = ..sql
+		Set tSQL = ..sql
+
+		If (..OnGetSQL '= "") {
+			Set tSC = ..%OnGetSQL(.tParms,.tSQL)
+			If $$$ISERR(tSC) {
+				Write "null"
+				Quit
+			}
+			Set ..sql = tSQL
+		}
+
+		Set tInfo = ##class(%ZEN.Auxiliary.QueryInfo).%New()
+		For i=1:1:$LISTLENGTH(..parms) 
+    	{
+	   		set tInfo.parms(i)=$LISTGET(..parms,i,"")
+    	}  
+    	
+		Set tRS = ..%CreateResultSet(.tSC,tInfo)
+		If $$$ISERR(tSC)||'$IsObject(tRS) {
+			Write "null"
+			Quit
+		}
+
+		// find number and name of columns
+		Kill tColInfo
+		If tRS.%IsA("%Library.ResultSet") {
+			Set tCols = tRS.GetColumnCount()
+			For c = 1:1:tCols { 
+				Set tColInfo(c,"name") = tRS.GetColumnHeader(c)
+			}
+		}
+		Else {
+			Set tCols = tRS.%ResultColumnCount
+			For c = 1:1:tCols {
+				Set tColInfo(c,"name") = tRS.%Metadata.columns.GetAt(c).label
+			}
+		}
+		Set ..sql = tOrigSQL
+
+		Set tLF=$S(..%Format["w":$C(13,10), ..%Format["n":$C(10), 1:"")
+		If ..%Format'=$TR(..%Format,"it123456789") { Set tN=+$ZStrip(..%Format,"<E'N"), $P(tTab,$S(..%Format["t":$C(9),1:" "),1+$S(tN:tN,..%Format["t":1,1:4))="" }
+		Else { Set tTab="" }
+		Set tIncludeWhitespace = (tLF_tTab'="")
+
+		// wrapper object for children array containing results
+		Write "{"
+		If tIncludeWhitespace Write tLF
+		Write """children"":["
+		If tIncludeWhitespace Write tLF
+
+		// fetch and emit JSON
+		// n.b. this should be pushed into the result set itself
+		Set tRow = 0
+		While (tRS.%Next(.tSC) && ((..maxRows = 0) || (tRow < ..maxRows))) {
+			Quit:$$$ISERR(tSC)
+			Set tRow = tRow + 1
+
+			Write $S(tRow>1:",",1:""),"{"
+			For c = 1:1:tCols {
+				Set tVal = tRS.%GetData(c)
+				Write $S(c>1:",",1:"")
+				Write $S(..%Format["u":$$$ZENJSUPAIR($G(tColInfo(c,"name")),tVal), 1:$$$ZENJSPAIR($G(tColInfo(c,"name")),tVal))
+			}
+			Write "}"
+			If tIncludeWhitespace Write tLF
+		}
+		Write "]"
+		If tIncludeWhitespace Write tLF
+		Write "}"
+		If tIncludeWhitespace Write tLF
+	}
+	Catch(ex) {
+		Write "null"
+		Set tSC = ex.AsStatus()
+	}
+	Quit tSC
+]]></Implementation>
+</Method>
+</Class>
+</Export>
