@@ -12,4 +12,5 @@ Installation.
 
 Usage example:
 do ##class(%ZEN.Auxiliary.jsonDynamicSQLProvider).%WriteJSONFromDynamicSQL("json","SELECT Name,Age FROM Sample.Person WHERE Name=? And Age>?",$LB(60,"John"))
+
 For details please refer to included documentation
