@@ -20,7 +20,7 @@ The JSON notation is written out the current device.
 <var>pParams</var> is the valid list, containing all input parameter values for SQL statement. Skip, if there is no parameters in the SQL statement.<br/>
 From a CSP page, you could invoke the method as follows:<br/>
 <example language="CSP">
-#(##class(%ZEN.Auxiliary.jsonDynamicSQLProvider).%WriteJSONFromDynamicSQL(,"SELECT Name,Age FROM Sample.Person WHERE Name=? And Age>?",$LB(60,"John")))#
+#(##class(%ZEN.Auxiliary.jsonDynamicSQLProvider).%WriteJSONFromDynamicSQL(,"SELECT Name,Age FROM Sample.Person WHERE Name=? And Age>?",$LB("John",60)))#
 </example>
 <var>pFormat</var> is a string of flags that control output formatting options.<br/>
 The following character option codes are supported:<br/>
