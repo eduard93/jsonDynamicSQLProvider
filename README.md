@@ -11,6 +11,6 @@ Installation.
 4. Make Cachelib database read-only (optional but recommended, see 1 for how-to)
 
 Usage example:
-do ##class(%ZEN.Auxiliary.jsonDynamicSQLProvider).%WriteJSONFromDynamicSQL("json","SELECT Name,Age FROM Sample.Person WHERE Name=? And Age>?",$LB(60,"John"))
+do ##class(%ZEN.Auxiliary.jsonDynamicSQLProvider).%WriteJSONFromDynamicSQL("json","SELECT Name,Age FROM Sample.Person WHERE Name=? And Age>?",$LB("John",60))
 
 For details please refer to included documentation
